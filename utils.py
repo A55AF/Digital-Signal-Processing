@@ -1,0 +1,304 @@
+import math
+import numpy as np
+from signal_framework import Signal
+import os
+
+
+def read_signal(path):
+    signal_type = False
+    is_periodic = False
+    matrix = np.empty((0, 2))
+
+    with open(path, "r") as f:
+        for i, line in enumerate(f):
+            if i == 0:
+                signal_type = line.strip() == "1"
+                continue
+            elif i == 1:
+                is_periodic = line.strip() == "1"
+                continue
+            elif i == 2:
+                continue
+            data = [float(d.rstrip("f")) for d in line.split()]
+            matrix = np.append(matrix, [data], axis=0)
+
+    signal = Signal(signal_type, is_periodic, matrix)
+    return signal
+
+
+# All signals specified in signals/ dir
+def list_signals(task_num):
+    path = f"signals/task{task_num}"
+    time_signals = {}
+    freq_signals = {}
+    for file_name in os.listdir(path):
+        full_path = os.path.join(path, file_name)
+        with open(full_path, "r") as f:
+            signal_type = f.readline().strip() == "1"
+            name = file_name.split(".")[0]
+            if signal_type == False:
+                time_signals[name] = full_path
+            else:
+                freq_signals[name] = full_path
+    return time_signals, freq_signals
+
+
+# Task 1
+def add(signal1, signal2):
+    if signal1.signal_type == signal2.signal_type and signal1.signal_type == False:
+        (x1, a1) = signal1.split()
+        (x2, a2) = signal2.split()
+
+        T = min(x1[-1], x2[-1])
+
+        N = max(len(a1), len(a2))
+
+        t = np.linspace(0, T, N)
+
+        signal1_resampled = np.interp(t, x1, a1)
+        signal2_resampled = np.interp(t, x2, a2)
+
+        a = signal1_resampled + signal2_resampled
+        result_matrix = np.column_stack((t, a))
+
+        result_signal = Signal(signal1.signal_type, signal1.is_periodic, result_matrix)
+        return result_signal
+
+
+# Task 2
+def sub(signal1, signal2):
+    if signal1.signal_type == signal2.signal_type and signal1.signal_type == False:
+        (x1, a1) = signal1.split()
+        (x2, a2) = signal2.split()
+
+        T = min(x1[-1], x2[-1])
+
+        N = max(len(a1), len(a2))
+
+        t = np.linspace(0, T, N)
+
+        signal1_resampled = np.interp(t, x1, a1)
+        signal2_resampled = np.interp(t, x2, a2)
+
+        a = signal1_resampled - signal2_resampled
+        result_matrix = np.column_stack((t, a))
+
+        result_signal = Signal(signal1.signal_type, signal1.is_periodic, result_matrix)
+        return result_signal
+
+
+# Task 1
+def add_all(signals):
+    result = signals[0]
+    for i in range(1, len(signals)):
+        result = add(result, signals[i])
+    return result
+
+
+# Task 2
+def sub_all(signals):
+    result = signals[0]
+    for i in range(1, len(signals)):
+        result = sub(result, signals[i])
+    return result
+
+
+# Task 1
+def mul(signal, const):
+    if signal.signal_type == False:
+        result = Signal(signal.signal_type, signal.is_periodic, signal.matrix)
+        result.matrix[:, 1] = result.matrix[:, 1] * const
+        return result
+
+
+# Task 2
+def square(signal):
+    if signal.signal_type == False:
+        result = Signal(signal.signal_type, signal.is_periodic, signal.matrix)
+        result.matrix[:, 1] = result.matrix[:, 1] * result.matrix[:, 1]
+        return result
+
+
+# Task 2
+def accumulation(signal):
+    if signal.signal_type == False:
+        result = Signal(signal.signal_type, signal.is_periodic, signal.matrix)
+        for i, value in enumerate(result.matrix[:, 1]):
+            if i > 0:
+                result.matrix[i, 1] += result.matrix[i - 1, 1]
+        return result
+
+
+# Testing
+def time_plot(plt):
+    plt.xlabel("Time")
+    plt.ylabel("Amplitude")
+    plt.grid(True)
+    plt.legend()
+
+
+# Testing
+def freq_plot(plt):
+    plt.xlabel("Frequency")
+    plt.ylabel("Amplitude")
+    plt.grid(True)
+    plt.legend()
+
+
+# Task 2
+def sin_wave(A, f, t, theta, B, is_sin=True):
+    signal = 0.0
+    if is_sin:
+        signal = A * np.sin(2 * np.pi * f * t + theta) + B
+    else:
+        signal = A * np.cos(2 * np.pi * f * t + theta) + B
+    return signal
+
+
+# Task 2
+def sin_wave_equation(A, f, t, theta, B, is_sin=True):
+    eq = ""
+    if is_sin:
+        eq = f"{A} * sin( 2π * {f} * {t} + {theta}) + {B}"
+    else:
+        eq = f"{A} * cos( 2π * {f} * {t} + {theta}) + {B}"
+    return eq
+
+
+# 0 => 0_to_1
+# 1 => -1_to_1
+# Task 2
+def normalize(signal, range_type=0):
+    t = None
+    a = None
+    p = None
+    if signal.signal_type == False:
+        t, a = signal.split()
+    else:
+        a, p = signal.split()
+    result = Signal(signal.signal_type, signal.is_periodic, signal.matrix)
+    if range_type == 0:
+        # [0, 1] normalization
+        signal_min = np.min(a)
+        signal_max = np.max(a)
+        if signal_max == signal_min:
+            a_normalized = np.full_like(a, 0.5)
+        else:
+            a_normalized = (a - signal_min) / (signal_max - signal_min)
+
+    elif range_type == 1:
+        # [-1, 1] normalization
+        signal_min = np.min(a)
+        signal_max = np.max(a)
+        if signal_max == signal_min:
+            a_normalized = np.zeros_like(a)
+        else:
+            a_normalized = 2 * (a - signal_min) / (signal_max - signal_min) - 1
+
+    if signal.signal_type == False:
+        result.matrix = np.column_stack((t, a_normalized))
+    else:
+        result.matrix = np.column_stack((a_normalized, p))
+    return result
+
+
+def itob(num, bits):
+    result = ""
+    while num > 0:
+        result = str(num % 2) + result
+        num //= 2
+    shift = "0" * int(bits - len(result))
+    result = shift + result
+    if len(result) > bits:
+        return None
+    return result
+
+
+def quantization(lvls_num, signal, plt=None):
+    x_min = np.min(signal.matrix[:, 1])
+    x_max = np.max(signal.matrix[:, 1])
+    delta = (x_max - x_min) / lvls_num
+
+    result = Signal(signal.signal_type, signal.is_periodic, signal.matrix.copy())
+    sz = len(signal.matrix[:, 1])
+    bits = int(np.log2(lvls_num))
+    lvls_encoded = np.empty(sz, dtype=f"U{bits}")
+    lvls = np.empty(sz, dtype=int)
+    err = np.empty(sz)
+    for i, amp in enumerate(result.matrix[:, 1]):
+        interval_index = (amp - x_min) / delta
+
+        if interval_index >= lvls_num:
+            interval_index = lvls_num - 1e-10
+
+        cur_lvl = int(interval_index)
+        lvls_encoded[i] = itob(cur_lvl, bits)
+        lvls[i] = cur_lvl + 1
+        low = x_min + cur_lvl * delta
+        high = x_min + (cur_lvl + 1) * delta
+        mid = (low + high) / 2
+        err[i] = mid - result.matrix[i, 1]
+        result.matrix[i, 1] = mid
+
+    if plt is not None:
+        for lvl in range(0, lvls_num):
+            line = x_min + (lvl) * delta
+            plt.axhline(y=line, color="grey")
+    return lvls, lvls_encoded, result, err
+
+
+def dft(signal, inv=False):
+    N = len(signal.matrix[:, 0])
+    result = None
+
+    if inv == True:
+        t = range(N)
+        a = []
+
+        for n in range(N):
+            real = 0.0
+            imag = 0.0
+
+            for k in range(N):
+                angle = 2 * math.pi * n * k / N + signal.matrix[k, 1]
+
+                real += signal.matrix[k, 0] * math.cos(angle)
+                imag += signal.matrix[k, 0] * math.sin(angle)
+
+            real /= N
+            a.append(real)
+
+        result_matrix = np.column_stack((t, a))
+        result = Signal(False, signal.is_periodic, result_matrix)
+
+    else:
+        a = []
+        p = []
+        for k in range(N):
+            real = 0.0
+            imag = 0.0
+
+            for n in range(N):
+                angle = -2 * math.pi * k * n / N
+
+                real += signal.matrix[n, 1] * math.cos(angle)
+                imag += signal.matrix[n, 1] * math.sin(angle)
+
+            amp = math.sqrt(real**2 + imag**2)
+            phase = math.atan2(imag, real)
+            a.append(amp)
+            p.append(phase)
+
+        result_matrix = np.column_stack((a, p))
+        result = Signal(True, signal.is_periodic, result_matrix)
+
+    return result
+
+
+def remove_dc_component(freq_signal):
+    result = Signal(
+        freq_signal.signal_type, freq_signal.is_periodic, freq_signal.matrix.copy()
+    )
+    if len(result.matrix) > 0:
+        result.matrix[0, 0] = 0.0 
+    return result
