@@ -1,3 +1,4 @@
+import cmath
 import math
 import numpy as np
 from signal_framework import Signal
@@ -302,3 +303,47 @@ def remove_dc_component(freq_signal):
     if len(result.matrix) > 0:
         result.matrix[0, 0] = 0.0 
     return result
+
+
+def FFT_IFFT(signal, inverse=0):
+
+    if inverse == 0:
+        _, a = signal.split()
+        x = a.astype(complex)
+        N = len(x)
+    else:
+        a, p = signal.split()
+        x = a * np.exp(1j * p)
+        N = len(x)
+
+    def recurse(x):
+        n = len(x)
+        if n == 1:
+            return x.copy()
+
+        even = recurse(x[0::2])
+        odd = recurse(x[1::2])
+
+        result = np.zeros(n, dtype=complex)
+        sign = 1 if inverse else -1
+        for k in range(n // 2):
+            W = cmath.exp(sign * 2j * cmath.pi * k / n)
+            result[k] = even[k] + W * odd[k]
+            result[k + n // 2] = even[k] - W * odd[k]
+            if inverse:
+                result[k] /= 2
+                result[k + n // 2] /= 2
+        return result
+
+    X = recurse(x)
+
+    if inverse == 0:
+        amplitudes = np.abs(X)
+        phases = np.angle(X)
+        matrix = np.column_stack((amplitudes, phases))
+        return Signal(True, signal.is_periodic, matrix)
+    else:
+        time_amplitude = np.real(X)
+        time_indices = np.arange(N)
+        matrix = np.column_stack((time_indices, time_amplitude))
+        return Signal(False, signal.is_periodic, matrix)

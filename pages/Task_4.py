@@ -214,7 +214,6 @@ if (
         new_phases.append(new_p)
 
     if st.button("Reconstruct signal (IDFT)", key=f"idft-{chosen}"):
-        # First reconstruct with original (unmodified) amplitudes and phases
         orig_matrix = np.column_stack(
             (np.array(amps, dtype=float), np.array(phases, dtype=float))
         )
@@ -223,7 +222,6 @@ if (
         _, orig_a_recon = orig_time_recon.split()
         orig_t_seconds = np.arange(len(orig_a_recon)) / data["fs"]
 
-        # Then reconstruct with modified amplitudes and phases
         mod_matrix = np.column_stack(
             (np.array(new_amps, dtype=float), np.array(new_phases, dtype=float))
         )
