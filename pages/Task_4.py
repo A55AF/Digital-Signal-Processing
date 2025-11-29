@@ -7,7 +7,7 @@ from signal_framework import Signal
 
 st.set_page_config(page_title="Task 4", page_icon="📈", layout="wide")
 
-(st.session_state["time-signals"], st.session_state["freq-signals"]) = list_signals(4)
+(st.session_state["time-signals"], st.session_state["freq-signals"]) = list_signals("task4")
 
 
 def ensure_state_keys():

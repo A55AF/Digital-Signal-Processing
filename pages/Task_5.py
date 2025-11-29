@@ -6,7 +6,7 @@ from utils import list_signals, read_signal, FFT_IFFT
 st.set_page_config(page_title="Task 5", page_icon="📈", layout="wide")
 
 try:
-    time_sigs, freq_sigs = list_signals(5)
+    time_sigs, freq_sigs = list_signals("task5")
     st.session_state["time-signals"] = time_sigs
     st.session_state["freq-signals"] = freq_sigs
 except Exception as e:

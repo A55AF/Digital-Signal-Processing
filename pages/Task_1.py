@@ -11,7 +11,7 @@ from utils import (
 st.set_page_config(page_title="Task 1",page_icon='📈' , layout="wide")
 
 
-(st.session_state["time-signals"], st.session_state["freq-signals"]) = list_signals(1)
+(st.session_state["time-signals"], st.session_state["freq-signals"]) = list_signals("task1")
 
 if "selected-time" not in st.session_state:
     st.session_state["selected-time"] = {}

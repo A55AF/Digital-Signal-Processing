@@ -6,7 +6,7 @@ from utils import accumulation, list_signals, normalize, read_signal, square, su
 st.set_page_config(page_title="Task 2 (Normalization)", page_icon="📶", layout="wide")
 
 
-(st.session_state["time-signals"], st.session_state["freq-signals"]) = list_signals(2)
+(st.session_state["time-signals"], st.session_state["freq-signals"]) = list_signals("task2")
 
 if "selected-time" not in st.session_state:
     st.session_state["selected-time"] = {}
