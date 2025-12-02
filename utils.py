@@ -10,7 +10,6 @@ def read_signal(path):
     is_periodic = False
     matrix = np.empty((0, 2))
 
-    # Try UTF-8 first, fallback to latin-1 if needed
     try:
         with open(path, "r", encoding="utf-8") as f:
             for i, line in enumerate(f):
@@ -42,21 +41,17 @@ def read_signal(path):
     return signal
 
 
-# All signals specified in signals/ dir
 def list_signals(relpath):
     path = os.path.join("signals",relpath)
     time_signals = {}
     freq_signals = {}
     for file_name in os.listdir(path):
         full_path = os.path.join(path, file_name)
-        # Skip directories; only process files
         if not os.path.isfile(full_path):
             continue
-        # Skip non-text files
         if not file_name.lower().endswith(".txt"):
             continue
         try:
-            # Try reading with UTF-8 encoding first, fallback to latin-1
             try:
                 with open(full_path, "r", encoding="utf-8") as f:
                     signal_type = f.readline().strip() == "1"
@@ -69,7 +64,6 @@ def list_signals(relpath):
             else:
                 freq_signals[name] = full_path
         except Exception:
-            # Skip files that can't be read
             continue
     return time_signals, freq_signals
 
@@ -434,7 +428,6 @@ def second_derivative(signal):
 
 
 def delay_advance(signal, k=0):
-    # k positive -> delay (shift right), k negative -> advance (shift left)
     if signal.signal_type != False:
         return None
     t, a = signal.split()
@@ -444,12 +437,10 @@ def delay_advance(signal, k=0):
 
 
 def fold_signal(signal):
-    # Folding (time reversal): y(n) = x(-n)
     if signal.signal_type != False:
         return None
     t, a = signal.split()
     new_t = -t
-    # Sort by time ascending
     indices = np.argsort(new_t)
     return Signal(False, signal.is_periodic, np.column_stack((new_t[indices], a[indices].copy())))
 
@@ -466,7 +457,6 @@ def remove_dc_time(signal):
     a_no_dc = a - np.mean(a)
     return Signal(False, signal.is_periodic, np.column_stack((t, a_no_dc)))
 
-# Implement Instead of built-in function
 def convolve_signals(signal1, signal2):
     if signal1.signal_type != False or signal2.signal_type != False:
         return None
@@ -477,71 +467,142 @@ def convolve_signals(signal1, signal2):
     dt1 = _estimate_dt(signal1)
     dt2 = _estimate_dt(signal2)
     dt = min(dt1, dt2)
-    conv = np.convolve(a1, a2)
-    # time runs from t1[0]+t2[0] to t1[-1]+t2[-1]
+    N1 = len(a1)
+    N2 = len(a2)
+    N = N1 + N2 - 1
+    conv = np.zeros(N, dtype=float)
+    for n in range(N):
+        k_min = max(0, n - (N2 - 1))
+        k_max = min(n, N1 - 1)
+        s = 0.0
+        for k in range(k_min, k_max + 1):
+            s += a1[k] * a2[n - k]
+        conv[n] = s
+
     t_start = t1[0] + t2[0]
-    t_end = t1[-1] + t2[-1]
-    N = len(conv)
-    t = np.linspace(t_start, t_end, N)
+    t = t_start + np.arange(N) * dt
     return Signal(False, signal1.is_periodic or signal2.is_periodic, np.column_stack((t, conv)))
 
-# Implement Instead of built-in function
 def normalized_cross_correlation(signal1, signal2):
     if signal1.signal_type != False or signal2.signal_type != False:
         return None
-    _, a1 = signal1.split()
-    _, a2 = signal2.split()
-    x = a1 - np.mean(a1)
-    y = a2 - np.mean(a2)
+    t1, a1 = signal1.split()
+    t2, a2 = signal2.split()
+    if len(a1) == len(a2):
+        x = a1.copy()
+        y = a2.copy()
+    else:
+        x = a1 - np.mean(a1)
+        y = a2 - np.mean(a2)
+
+    N1 = len(x)
+    N2 = len(y)
+    if N1 == 0 or N2 == 0:
+        return Signal(False, signal1.is_periodic or signal2.is_periodic, np.empty((0, 2)))
+
+    if N1 == N2:
+        denom = np.sqrt(np.sum(x ** 2) * np.sum(y ** 2))
+        corr_circ = np.zeros(N1, dtype=float)
+        for k in range(N1):
+            s = 0.0
+            for n in range(N1):
+                m = (n + k) % N1
+                s += x[n] * y[m]
+            corr_circ[k] = 0.0 if denom == 0 else s / denom
+        matrix = np.column_stack((t1.astype(float), corr_circ))
+        return Signal(False, signal1.is_periodic or signal2.is_periodic, matrix)
+
+    L = N1 + N2 - 1
+    lags = np.arange(-(N2 - 1), N1)
+    corr = np.zeros(L, dtype=float)
+
+    for idx, lag in enumerate(lags):
+        n_start = max(0, -lag)
+        n_end = min(N1 - 1, N2 - 1 - lag)
+        s = 0.0
+        for n in range(n_start, n_end + 1):
+            m = n + lag
+            s += x[n] * y[m]
+        corr[idx] = s
+
     denom = np.sqrt(np.sum(x ** 2) * np.sum(y ** 2))
     if denom == 0:
-        corr = np.correlate(x, y, mode="full")
-        return corr * 0.0
-    corr = np.correlate(x, y, mode="full") / denom
-    return corr
+        corr = corr * 0.0
+    else:
+        corr = corr / denom
 
-# Implement Instead of built-in function
+    matrix = np.column_stack((lags.astype(float), corr))
+    return Signal(False, signal1.is_periodic or signal2.is_periodic, matrix)
+
 def normalized_autocorrelation(signal):
     if signal.signal_type != False:
         return None
-    _, a = signal.split()
-    x = a - np.mean(a)
-    denom = np.sum(x ** 2)
-    if denom == 0:
-        return np.zeros(2 * len(x) - 1)
-    corr = np.correlate(x, x, mode="full") / denom
-    return corr
+    t, a = signal.split()
+    N = len(a)
+    if N == 0:
+        return Signal(False, signal.is_periodic, np.empty((0, 2)))
 
+    x = a.copy()
+    denom = np.sum(x ** 2)
+    L = 2 * N - 1
+    corr = np.zeros(L, dtype=float)
+    if denom != 0:
+        for k in range(L):
+            lag = k - (N - 1)
+            s = 0.0
+            n_start = max(0, -lag)
+            n_end = min(N - 1, N - 1 - lag)
+            for n in range(n_start, n_end + 1):
+                m = n + lag
+                s += x[n] * x[m]
+            corr[k] = s / denom
+
+    lags = np.arange(-(N - 1), N)
+    matrix = np.column_stack((lags.astype(float), corr))
+    return Signal(False, signal.is_periodic, matrix)
 
 def periodic_cross_correlation(signal1, signal2):
     if signal1.signal_type != False or signal2.signal_type != False:
         return None
-    _, a1 = signal1.split()
-    _, a2 = signal2.split()
+    t1, a1 = signal1.split()
+    t2, a2 = signal2.split()
     N1 = len(a1)
     N2 = len(a2)
     if N1 == 0 or N2 == 0:
         return None
-    L = int(math.lcm(N1, N2)) if hasattr(math, "lcm") else N1 * N2
-    x = np.tile(a1 - np.mean(a1), int(L / N1))
-    y = np.tile(a2 - np.mean(a2), int(L / N2))
-    X = np.fft.fft(x)
-    Y = np.fft.fft(y)
-    corr = np.fft.ifft(X * np.conj(Y))
-    # real part and normalize by energies
-    corr = np.real(corr)
-    denom = np.sqrt(np.sum(x ** 2) * np.sum(y ** 2))
-    if denom == 0:
-        return corr * 0.0
-    return corr / denom
+    L = N1 + N2 - 1
+    x = np.zeros(L, dtype=float)
+    y = np.zeros(L, dtype=float)
+    x[:N1] = a1
+    y[:N2] = a2
+
+    denom = math.sqrt(np.sum(a1 ** 2) * np.sum(a2 ** 2))
+    corr = np.zeros(L, dtype=float)
+    if denom != 0:
+        for k in range(L):
+            s = 0.0
+            for n in range(L):
+                m = (n + k) % L
+                s += x[n] * y[m]
+            corr[k] = s / denom
+    else:
+        corr[:] = 0.0
+
+    lags = np.arange(L)
+    matrix = np.column_stack((lags.astype(float), corr))
+    return Signal(False, signal1.is_periodic or signal2.is_periodic, matrix)
 
 
 def time_delay_analysis(signal1, signal2, Ts=1.0):
     corr = periodic_cross_correlation(signal1, signal2)
     if corr is None:
         return None
-    L = len(corr)
-    idx = int(np.argmax(corr))
+    if hasattr(corr, "split"):
+        _, corr_arr = corr.split()
+    else:
+        corr_arr = corr
+    L = len(corr_arr)
+    idx = int(np.argmax(corr_arr))
     if idx > L // 2:
         lag = idx - L
     else:

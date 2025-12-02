@@ -41,7 +41,6 @@ def _get_signals_for_operation(operation):
     time_signals = {}
     freq_signals = {}
     candidates = op_to_folders.get(operation, ["general"])
-    # Always include general folder for all operations
     if "general" not in candidates:
         candidates.append("general")
     
@@ -138,7 +137,6 @@ for signal, checked in st.session_state["selected-freq"].items():
 
 st.sidebar.checkbox("Continuous", key="cont")
 
-# Operations
 option = st.sidebar.radio(
     "Operations",
     [
@@ -167,7 +165,6 @@ time_selected = any(st.session_state["selected-time"].values())
 freq_selected = any(st.session_state["selected-freq"].values())
 selected_signals = time_selected or freq_selected
 
-# Process operations
 if option == "Smoothing (Moving Average)":
     list_signals_selection()
     window = st.sidebar.number_input(
@@ -377,21 +374,21 @@ elif option == "Normalized Cross-correlation":
                     if s1 is not None and s2 is not None:
                         corr = normalized_cross_correlation(s1, s2)
                         if corr is not None:
-                            lags = np.arange(
-                                -len(s1.matrix[:, 1]) + 1, len(s2.matrix[:, 1])
-                            )
-                            ax.plot(
-                                lags,
-                                corr,
-                                label=f"NCC ({sig1_name}, {sig2_name})",
-                            )
+                            if hasattr(corr, "split"):
+                                t_corr, a_corr = corr.split()
+                                ax.plot(t_corr, a_corr, label=f"NCC ({sig1_name}, {sig2_name})")
+                            else:
+                                lags = np.arange(-len(s1.matrix[:, 1]) + 1, len(s2.matrix[:, 1]))
+                                ax.plot(lags, corr, label=f"NCC ({sig1_name}, {sig2_name})")
                         else:
                             ac = normalized_autocorrelation(s1)
                             if ac is not None:
-                                lags = np.arange(
-                                    -len(s1.matrix[:, 1]) + 1, len(s1.matrix[:, 1])
-                                )
-                                ax.plot(lags, ac, label=f"Autocorr ({sig1_name})")
+                                if hasattr(ac, "split"):
+                                    lags, ac_vals = ac.split()
+                                    ax.plot(lags, ac_vals, label=f"Autocorr ({sig1_name})")
+                                else:
+                                    lags = np.arange(-len(s1.matrix[:, 1]) + 1, len(s1.matrix[:, 1]))
+                                    ax.plot(lags, ac, label=f"Autocorr ({sig1_name})")
             except Exception as e:
                 st.sidebar.error(f"Error in correlation: {str(e)}")
 
@@ -400,7 +397,6 @@ elif option == "Normalized Autocorrelation":
     op_selected = {}
     for name in operation_time_signals.keys():
         op_selected[name] = st.session_state["selected-time"][name]
-    print(op_selected)
     for name, selected in op_selected.items():
         if selected:
             try:
@@ -410,11 +406,19 @@ elif option == "Normalized Autocorrelation":
                     if signal is not None:
                         ac = normalized_autocorrelation(signal)
                         if ac is not None:
-                            lags = np.arange(
-                                -len(signal.matrix[:, 1]) + 1,
-                                len(signal.matrix[:, 1]),
-                            )
-                            ax.plot(lags, ac, label=f"Autocorr ({name})")
+                            if hasattr(ac, "split"):
+                                lags, ac_vals = ac.split()
+                            else:
+                                lags = np.arange(
+                                    -len(signal.matrix[:, 1]) + 1,
+                                    len(signal.matrix[:, 1]),
+                                )
+                                ac_vals = ac
+
+                            if st.session_state.get("cont", False):
+                                ax.plot(lags, ac_vals, label=f"Autocorr ({name})")
+                            else:
+                                ax.stem(lags, ac_vals, label=f"Autocorr ({name})")
             except Exception as e:
                 st.sidebar.error(f"Error processing {name}: {str(e)}")
 
@@ -440,12 +444,12 @@ elif option == "Periodic Cross-correlation":
                     if s1 is not None and s2 is not None:
                         corr = periodic_cross_correlation(s1, s2)
                         if corr is not None:
-                            lags = np.arange(len(corr))
-                            ax.plot(
-                                lags,
-                                corr,
-                                label=f"Periodic CC ({sig1_name}, {sig2_name})",
-                            )
+                            if hasattr(corr, "split"):
+                                t_corr, a_corr = corr.split()
+                                ax.plot(t_corr, a_corr, label=f"Periodic CC ({sig1_name}, {sig2_name})")
+                            else:
+                                lags = np.arange(len(corr))
+                                ax.plot(lags, corr, label=f"Periodic CC ({sig1_name}, {sig2_name})")
             except Exception as e:
                 st.sidebar.error(f"Error in periodic correlation: {str(e)}")
     else:
@@ -480,18 +484,17 @@ elif option == "Time Delay Analysis (periodic)":
                             st.sidebar.success(
                                 f"Estimated delay: {delay_seconds:.4f} seconds (lag = {lag} samples)"
                             )
-                            lags = np.arange(len(corr))
-                            ax.plot(
-                                lags,
-                                corr,
-                                label=f"Time Delay Corr ({sig1_name}, {sig2_name})",
-                            )
+                            if hasattr(corr, "split"):
+                                t_corr, a_corr = corr.split()
+                                ax.plot(t_corr, a_corr, label=f"Time Delay Corr ({sig1_name}, {sig2_name})")
+                            else:
+                                lags = np.arange(len(corr))
+                                ax.plot(lags, corr, label=f"Time Delay Corr ({sig1_name}, {sig2_name})")
             except Exception as e:
                 st.sidebar.error(f"Error in time delay analysis: {str(e)}")
     else:
         st.sidebar.info("Please select at least 2 signals for time delay analysis")
 
-# Auto-scale axes to fit the data
 ax.relim()
 ax.autoscale()
 
