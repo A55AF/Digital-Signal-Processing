@@ -42,7 +42,7 @@ def read_signal(path):
 
 
 def list_signals(relpath):
-    path = os.path.join("signals",relpath)
+    path = os.path.join("signals", relpath)
     time_signals = {}
     freq_signals = {}
     for file_name in os.listdir(path):
@@ -325,7 +325,7 @@ def remove_dc_component(freq_signal):
         freq_signal.signal_type, freq_signal.is_periodic, freq_signal.matrix.copy()
     )
     if len(result.matrix) > 0:
-        result.matrix[0, 0] = 0.0 
+        result.matrix[0, 0] = 0.0
     return result
 
 
@@ -386,14 +386,16 @@ def moving_average(signal, window_size=3):
     t, a = signal.split()
     if window_size <= 1:
         return Signal(False, signal.is_periodic, signal.matrix.copy())
-    new_sz = len(a) - window_size + 1 
+    new_sz = len(a) - window_size + 1
     a_avg = np.zeros(new_sz)
-    for i in range(0,window_size):
+    for i in range(0, window_size):
         a_avg[0] += a[i]
     a_avg[0] /= window_size
-    for i in range (1, new_sz):
-        if i+window_size-1 < len(a):
-            a_avg[i] = (a_avg[i-1] * window_size - a[i-1] + a[i+window_size-1]) / window_size 
+    for i in range(1, new_sz):
+        if i + window_size - 1 < len(a):
+            a_avg[i] = (
+                a_avg[i - 1] * window_size - a[i - 1] + a[i + window_size - 1]
+            ) / window_size
     result = Signal(False, signal.is_periodic, np.column_stack((t[0:new_sz], a_avg)))
     return result
 
@@ -406,10 +408,10 @@ def first_derivative(signal):
     y = np.zeros_like(a)
     if len(a) > 0:
         y[0] = 0.0
-    for i in range(0,len(a)):
+    for i in range(0, len(a)):
         y[i] = a[i]
-        if i > 0 :
-            y[i] -= a[i-1]
+        if i > 0:
+            y[i] -= a[i - 1]
     return Signal(False, signal.is_periodic, np.column_stack((t, y)))
 
 
@@ -419,9 +421,9 @@ def second_derivative(signal):
     t, a = signal.split()
     # y[n] = x[n+1] - 2 x[n] + x[n-1]
     y = np.zeros_like(a)
-    for i in range(0,len(a)):
+    for i in range(0, len(a)):
         if 1 < i < len(a) - 1:
-            y[i] = a[i+1] - 2 * a[i] + a[i-1]
+            y[i] = a[i + 1] - 2 * a[i] + a[i - 1]
         else:
             y[i] = 0.0
     return Signal(False, signal.is_periodic, np.column_stack((t, y)))
@@ -442,7 +444,9 @@ def fold_signal(signal):
     t, a = signal.split()
     new_t = -t
     indices = np.argsort(new_t)
-    return Signal(False, signal.is_periodic, np.column_stack((new_t[indices], a[indices].copy())))
+    return Signal(
+        False, signal.is_periodic, np.column_stack((new_t[indices], a[indices].copy()))
+    )
 
 
 def fold_and_shift(signal, k=0):
@@ -456,6 +460,7 @@ def remove_dc_time(signal):
     t, a = signal.split()
     a_no_dc = a - np.mean(a)
     return Signal(False, signal.is_periodic, np.column_stack((t, a_no_dc)))
+
 
 def convolve_signals(signal1, signal2):
     if signal1.signal_type != False or signal2.signal_type != False:
@@ -481,7 +486,10 @@ def convolve_signals(signal1, signal2):
 
     t_start = t1[0] + t2[0]
     t = t_start + np.arange(N) * dt
-    return Signal(False, signal1.is_periodic or signal2.is_periodic, np.column_stack((t, conv)))
+    return Signal(
+        False, signal1.is_periodic or signal2.is_periodic, np.column_stack((t, conv))
+    )
+
 
 def normalized_cross_correlation(signal1, signal2):
     if signal1.signal_type != False or signal2.signal_type != False:
@@ -498,10 +506,12 @@ def normalized_cross_correlation(signal1, signal2):
     N1 = len(x)
     N2 = len(y)
     if N1 == 0 or N2 == 0:
-        return Signal(False, signal1.is_periodic or signal2.is_periodic, np.empty((0, 2)))
+        return Signal(
+            False, signal1.is_periodic or signal2.is_periodic, np.empty((0, 2))
+        )
 
     if N1 == N2:
-        denom = np.sqrt(np.sum(x ** 2) * np.sum(y ** 2))
+        denom = np.sqrt(np.sum(x**2) * np.sum(y**2))
         corr_circ = np.zeros(N1, dtype=float)
         for k in range(N1):
             s = 0.0
@@ -525,7 +535,7 @@ def normalized_cross_correlation(signal1, signal2):
             s += x[n] * y[m]
         corr[idx] = s
 
-    denom = np.sqrt(np.sum(x ** 2) * np.sum(y ** 2))
+    denom = np.sqrt(np.sum(x**2) * np.sum(y**2))
     if denom == 0:
         corr = corr * 0.0
     else:
@@ -533,6 +543,7 @@ def normalized_cross_correlation(signal1, signal2):
 
     matrix = np.column_stack((lags.astype(float), corr))
     return Signal(False, signal1.is_periodic or signal2.is_periodic, matrix)
+
 
 def normalized_autocorrelation(signal):
     if signal.signal_type != False:
@@ -543,7 +554,7 @@ def normalized_autocorrelation(signal):
         return Signal(False, signal.is_periodic, np.empty((0, 2)))
 
     x = a.copy()
-    denom = np.sum(x ** 2)
+    denom = np.sum(x**2)
     L = 2 * N - 1
     corr = np.zeros(L, dtype=float)
     if denom != 0:
@@ -561,6 +572,7 @@ def normalized_autocorrelation(signal):
     matrix = np.column_stack((lags.astype(float), corr))
     return Signal(False, signal.is_periodic, matrix)
 
+
 def periodic_cross_correlation(signal1, signal2):
     if signal1.signal_type != False or signal2.signal_type != False:
         return None
@@ -576,7 +588,7 @@ def periodic_cross_correlation(signal1, signal2):
     x[:N1] = a1
     y[:N2] = a2
 
-    denom = math.sqrt(np.sum(a1 ** 2) * np.sum(a2 ** 2))
+    denom = math.sqrt(np.sum(a1**2) * np.sum(a2**2))
     corr = np.zeros(L, dtype=float)
     if denom != 0:
         for k in range(L):
@@ -609,3 +621,205 @@ def time_delay_analysis(signal1, signal2, Ts=1.0):
         lag = idx
     delay_seconds = lag * Ts
     return delay_seconds, lag, corr
+
+
+def compute_N(delta_f, fs, delta_s):
+    delta_f_norm = delta_f / fs
+    
+    # Choose A based on required attenuation (delta_s) and window type
+    if delta_s <= 21:
+        A = 0.9  # Rectangular window
+    elif delta_s <= 44:
+        A = 3.1  # Hanning window
+    elif delta_s <= 53:
+        A = 3.3  # Hamming window
+    else:
+        A = 5.5  # Blackman window
+    
+    N_float = A / delta_f_norm
+    N = int(math.ceil(N_float))
+
+    if N < 3:
+        N = 3
+
+    if N % 2 == 0:
+        N += 1
+
+    return N
+
+def choose_window(delta_s):
+    if delta_s <= 21:
+        window_type = "rectangular"
+    elif delta_s <= 44:
+        window_type = "hanning"
+    elif delta_s <= 53:
+        window_type = "hamming"
+    else:
+        window_type = "blackman"
+
+    return window_type
+
+
+def normalize_freq(filter_type, fs, fc=None, f1=None, f2=None):
+    if filter_type in ["Low Pass", "High Pass"]:
+        fc_norm = fc / fs
+        return fc_norm
+    elif filter_type in ["Band Pass", "Band Stop"]:
+        f1_norm = f1 / fs
+        f2_norm = f2 / fs
+        return f1_norm, f2_norm
+
+
+def shift_freq(filter_type, half_delta_f, fc=None, f1=None, f2=None):
+    if filter_type == "Low Pass":
+        shifted_fc = fc + half_delta_f
+        return shifted_fc
+    elif filter_type == "High Pass":
+        shifted_fc = fc - half_delta_f
+        return shifted_fc
+    elif filter_type == "Band Pass":
+        shifted_f1 = f1 - half_delta_f
+        shifted_f2 = f2 + half_delta_f
+        return shifted_f1, shifted_f2
+    elif filter_type == "Band Stop":
+        shifted_f1 = f1 + half_delta_f
+        shifted_f2 = f2 - half_delta_f
+        return shifted_f1, shifted_f2
+
+
+def make_window(window_type, N):
+    if window_type == "rectangular":
+        return np.ones(N)
+    elif window_type == "hanning":
+        return np.hanning(N)
+    elif window_type == "hamming":
+        return np.hamming(N)
+    elif window_type == "blackman":
+        return np.blackman(N)
+
+
+def compute_fir_coff(filter_type,fc=None,f1=None,f2=None,N=51,window_type="hamming"):
+    m = (N-1) // 2
+    n = np.arange(N)
+    k = n - m
+    
+    h_ideal = np.zeros(N, dtype=float)
+    
+    delta = np.zeros(N)
+    delta[m] = 1
+    
+    if filter_type == "Low Pass":
+        x = 2.0 * fc * k
+        h_ideal = 2.0 * fc * np.sinc(x)
+    elif filter_type == "High Pass":
+        x = 2.0 * fc * k
+        h_ideal = delta - 2.0 * fc * np.sinc(x)
+    elif filter_type == "Band Pass":
+        x1 = 2.0 * f1 * k
+        x2 = 2.0 * f2 * k
+        h_ideal = 2 * f2 * np.sinc(x2) - 2 * f1 * np.sinc(x1)
+    elif filter_type == "Band Stop":
+        x1 = 2.0 * f1 * k
+        x2 = 2.0 * f2 * k
+        h_ideal = 2.0 * f1 * np.sinc(x1) + (delta - 2.0 * f2 * np.sinc(x2)) 
+    
+    w = make_window(window_type, N)
+    h = h_ideal * w
+    
+    return h, h_ideal, w
+
+def apply_filter(x, h):
+    y = x * h
+    return y
+
+def apply_conv(x, h):
+    t = np.zeros(len(x))
+    x_signal = Signal(False,False,np.column_stack((t, x)))
+    h_signal = Signal(False,False,np.column_stack((t[:len(h)], h)))
+    _,y = convolve_signals(x_signal,h_signal).split()
+    
+    return y
+
+def apply_conv_same(x, h):
+    y_full = np.convolve(x, h, mode='full')
+    return y_full
+
+def save_txt(h, filepath="signals/task7/coff/coffecients.txt"):
+    np.savetxt(filepath, h, fmt="%.8f")
+
+def upsample(signal, L):
+    if signal.signal_type != False:
+        return None
+    t, a = signal.split()
+    N = len(a)
+    a_up = np.zeros(N * L)
+    a_up[::L] = a
+    
+    dt = _estimate_dt(signal)
+    t_up = t[0] + np.arange(N * L) * (dt / L)
+    
+    return Signal(False, signal.is_periodic, np.column_stack((t_up, a_up)))
+
+def downsample(signal, M):
+    if signal.signal_type != False:
+        return None
+    t, a = signal.split()
+    a_down = a[::M]
+    t_down = t[::M]
+    
+    return Signal(False, signal.is_periodic, np.column_stack((t_down, a_down)))
+
+def resample_signal(signal, M, L, filter_specs=None):
+    if M == 0 and L == 0:
+        raise ValueError("Both M and L cannot be zero")
+    
+    result = signal
+    h = None
+    
+    if M == 0 and L != 0:
+        result = upsample(result, L)
+        if filter_specs:
+            h, _, _ = compute_fir_coff(
+                filter_type="Low Pass",
+                fc=filter_specs['fc_norm'],
+                N=filter_specs['N'],
+                window_type=filter_specs['window_type']
+            )
+            t_before, a = result.split()
+            a_filtered = apply_conv_same(a, h)
+            dt = _estimate_dt(result)
+            t_new = t_before[0] + np.arange(len(a_filtered)) * dt
+            result = Signal(False, result.is_periodic, np.column_stack((t_new, a_filtered)))
+    
+    elif M != 0 and L == 0:
+        if filter_specs:
+            h, _, _ = compute_fir_coff(
+                filter_type="Low Pass",
+                fc=filter_specs['fc_norm'],
+                N=filter_specs['N'],
+                window_type=filter_specs['window_type']
+            )
+            t_before, a = result.split()
+            a_filtered = apply_conv_same(a, h)
+            dt = _estimate_dt(result)
+            t_new = t_before[0] + np.arange(len(a_filtered)) * dt
+            result = Signal(False, result.is_periodic, np.column_stack((t_new, a_filtered)))
+        result = downsample(result, M)
+    
+    elif M != 0 and L != 0:
+        result = upsample(result, L)
+        if filter_specs:
+            h, _, _ = compute_fir_coff(
+                filter_type="Low Pass",
+                fc=filter_specs['fc_norm'],
+                N=filter_specs['N'],
+                window_type=filter_specs['window_type']
+            )
+            t_before, a = result.split()
+            a_filtered = apply_conv_same(a, h)
+            dt = _estimate_dt(result)
+            t_new = t_before[0] + np.arange(len(a_filtered)) * dt
+            result = Signal(False, result.is_periodic, np.column_stack((t_new, a_filtered)))
+        result = downsample(result, M)
+    
+    return result, h
